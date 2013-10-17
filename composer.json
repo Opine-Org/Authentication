@@ -1,0 +1,22 @@
+{
+    "name": "virtuecenter/authentication",
+    "type": "library",
+    "description": "Authentication module",
+    "keywords": [],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ryan Mahoney",
+            "email": "ryan@virtuecenter.com",
+            "homepage": "http://www.virtuecenter.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+    	"php": ">=5.4.0",
+        "hybridauth/hybridauth": "3.0.0.*@dev"
+    },
+    "autoload": {
+        "psr-0": {"Authentication": "src/"}
+    }
+}
