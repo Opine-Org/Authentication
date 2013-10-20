@@ -13,10 +13,10 @@ class Authentication {
 	}
 
 	public function valid ($name) {
-		if (!isset($_SESSION['auth']) { {
+		if (!isset($_SESSION['auth'])) {
 			return false;
 		}
-		if (!isset($_SESSION['auth'][$name]) {
+		if (!isset($_SESSION['auth'][$name])) {
 			return false;
 		}
 		if (!isset($_SESSION['auth'][$name]['status'])) {
