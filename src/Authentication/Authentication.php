@@ -26,13 +26,9 @@ namespace Authentication;
 
 class Authentication {
 	private $db;
-	private $separation;
-	private $response;
 
-	public function __construct ($db, $config, $separation, $response) {
+	public function __construct ($db) {
 		$this->db = $db;
-		$this->separation = $separation;
-		$this->response = $response;
 	}
 
 	public function valid ($name) {
@@ -48,7 +44,7 @@ class Authentication {
 		if ($_SESSION['auth'][$name]['status'] !== true) {
 			return false;
 		}
-		return true;
+		return $_SESSION['auth'][$name]['_id'];
 	}
 
 	public function login ($name) {
