@@ -52,16 +52,18 @@ class Authentication {
 		return false;
 	}
 
-	public function login ($identity, $password, $identityField='email') {
-//FIXME: rate limit...
+	public function login ($identity, $password, $identityField='email', $criteria=false) {
+		if ($criteria === false) {
+			$criteria = [
+				$identityField => $identity,
+				'password' => $this->passwordHash($password)
+			];
+		}
 		if ($identityField == 'email') {
 			$identity = trim(strtolower($identity));
 		}
 		$user = $this->db->collection('users')->findOne(
-			[
-				$identityField => $identity,
-				'password' => $this->passwordHash($password)
-			], [
+			$criteria, [
 				'_id', 
 				'email', 
 				'first_name', 
@@ -99,7 +101,7 @@ class Authentication {
 		$_SESSION['user'] = [];
 	}
 
-	private function passwordHash ($password) {
+	public function passwordHash ($password) {
 		$config = $this->config->auth;
 		return sha1($config['salt'] . $password);
 	}
@@ -163,55 +165,68 @@ class Authentication {
 		if (!isset($this->routes)) {
 			return;
 		}
+		$this->slim->hook('slim.before.dispatch', function () {
+			$pattern = $this->slim->router()->getCurrentRoute()->getPattern();
+			$this->checkRoute($pattern, true);	
+		});
+	}
+
+	public function checkRoute ($pattern, $send=true) {
 		$routes = array_keys($this->routes);
 		$regexes = array_keys($this->regexes);
-		$this->slim->hook('slim.before.dispatch', function () use ($routes, $regexes) {
-			$pattern = $this->slim->router()->getCurrentRoute()->getPattern();
-			$groups = [];
-			if (in_array($pattern, $routes)) {
-				$groups = $this->routes[$pattern];
-			} elseif (count($regexes) > 0) {
-				try {
-					foreach ($regexes as $regex) {
-						if (preg_match($regex, $pattern)) {
-							$groups = $this->regexes[$regex];
-							break; 
-						}
+		$groups = [];
+		if (in_array($pattern, $routes)) {
+			$groups = $this->routes[$pattern];
+		} elseif (count($regexes) > 0) {
+			try {
+				foreach ($regexes as $regex) {
+					if (preg_match($regex, $pattern)) {
+						$groups = $this->regexes[$regex];
+						break; 
 					}
-				} catch (\Exception $e) {
-					echo $e->getMessage(), ': ', $regex, ' ', $pattern;
-					exit;
 				}
+			} catch (\Exception $e) {
+				echo $e->getMessage(), ': ', $regex, ' ', $pattern;
+				exit;
+			}
+		} else {
+			return true;
+		}
+		if (count($groups) == 0) {
+			return true;
+		}
+		if (!$this->authenticatedCheck()) {
+			$redirect = '/form/login';
+			if (isset($this->redirectsLogin[$groups[0]])) {
+				$redirect = $this->redirectsLogin[$groups[0]];
+			}
+			if ($send === true) {
+				header('Location: ' . $redirect);
+				exit;
 			} else {
-				return;
+				return false;
 			}
-			if (count($groups) == 0) {
-				return;
+		}
+		$authorized = false;
+		foreach ($groups as $group) {
+			if ($this->permission($group)) {
+				$authorized = true;
+				break;
 			}
-			if (!$this->authenticatedCheck()) {
-				$redirect = '/form/login';
-				if (isset($this->redirectsLogin[$groups[0]])) {
-					$redirect = $this->redirectsLogin[$groups[0]];
-				}
+		}
+		if ($authorized !== true) {
+			$redirect = '/noaccess';
+			if (isset($this->redirectsDenied[$groups[0]])) {
+				$redirect = $this->redirectsDenied[$groups[0]];
+			}
+			if ($send === true) {
 				header('Location: ' . $redirect);
 				exit;
+			} else {
+				return false;
 			}
-			$authorized = false;
-			foreach ($groups as $group) {
-				if ($this->permission($group)) {
-					$authorized = true;
-					break;
-				}
-			}
-			if ($authorized !== true) {
-				$redirect = '/noaccess';
-				if (isset($this->redirectsDenied[$groups[0]])) {
-					$redirect = $this->redirectsDenied[$groups[0]];
-				}
-				header('Location: ' . $redirect);
-				exit;
-			}
-		});
+		}
+		return true;
 	}
 
 	public function build () {
@@ -225,10 +240,28 @@ class Authentication {
 			'redirectsLogin' => $this->redirectsLogin,
 			'redirectsDenied' => $this->redirectsDenied
 		], JSON_PRETTY_PRINT);
+		$groups = [];
+		foreach (array_merge(array_values($this->regexes), array_values($this->routes)) as $values) {
+			foreach ($values as $group) {
+				$groups[] = $group;
+			}
+		}
+		$groups = array_unique($groups);
+		sort($groups);
+		foreach ($groups as $group) {
+			$this->groupCheck($group);
+		}
 		$key = $this->root . '-acl.json';
 		$this->cache->set($key, $json, 2, 0);
 		$buildFile = $this->root . '/../acl/_build.json';
 		file_put_contents($buildFile, $json);
+	}
+
+	private function groupCheck ($group) {
+		$check = $this->db->collection('groups')->findOne(['title' => $group]);
+		if (!isset($check['_id'])) {
+			$this->db->collection('groups')->save(['title' => $group]);
+		}
 	}
 
 	public function cacheSet ($auth) {
