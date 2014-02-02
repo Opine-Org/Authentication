@@ -1,5 +1,5 @@
 {
-    "name": "Opine/Authentication",
+    "name": "opine/authentication",
     "type": "library",
     "description": "The Opine Authentication service provides login, logout and flexible ACL enforcement to users accross groups.",
     "keywords": [],
