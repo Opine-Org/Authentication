@@ -17,6 +17,6 @@
         "hybridauth/hybridauth": "3.0.0.*@dev"
     },
     "autoload": {
-        "psr-4": {"Opine": "src/"}
+        "psr-4": {"Opine\\": "src/"}
     }
 }
