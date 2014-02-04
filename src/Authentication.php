@@ -35,6 +35,7 @@ class Authentication {
     private $redirectsLogin = [];
     private $redirectsDenied = [];
     private $root;
+    private $redirect = false;
 
     public function __construct ($root, $db, $config, $yamlSlow, $slim, $cache) {
         $this->db = $db;
@@ -166,7 +167,12 @@ class Authentication {
             return;
         }
         $this->slim->hook('slim.before.dispatch', function () {
-            $pattern = $this->slim->router()->getCurrentRoute()->getPattern();
+            $pattern = $_SERVER['REQUEST_URI'];
+            $this->redirect = $pattern;
+            if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
+                $pattern = substr($pattern, 0, ((strlen($_SERVER['QUERY_STRING']) + 1) * -1));
+                $this->redirect .= '?' . $_SERVER['QUERY_STRING'];
+            }
             $this->checkRoute($pattern, true);  
         });
     }
@@ -201,7 +207,9 @@ class Authentication {
                 $redirect = $this->redirectsLogin[$groups[0]];
             }
             if ($send === true) {
-                header('Location: ' . $redirect);
+                $location = 'Location: ' . $redirect;
+                $this->redirectAppend($location);
+                header($location);
                 exit;
             } else {
                 return false;
@@ -220,13 +228,25 @@ class Authentication {
                 $redirect = $this->redirectsDenied[$groups[0]];
             }
             if ($send === true) {
-                header('Location: ' . $redirect);
+                $location = 'Location: ' . $redirect;
+                $this->redirectAppend($location);
+                header($location);
                 exit;
             } else {
                 return false;
             }
         }
         return true;
+    }
+
+    private function redirectAppend (&$location) {
+        if ($this->redirect !== false) {
+            if (substr_count($location, '?') > 0) {
+                $location .= '&redirect=' . urlencode($this->redirect);
+            } else {
+                $location .= '?redirect=' . urlencode($this->redirect);
+            }
+        }
     }
 
     public function build () {
