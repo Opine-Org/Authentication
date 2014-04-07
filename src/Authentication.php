@@ -28,7 +28,7 @@ class Authentication {
     private $db;
     private $config;
     private $yamlSlow;
-    private $slim;
+    private $route;
     private $cache;
     private $routes = [];
     private $regexes = [];
@@ -37,11 +37,11 @@ class Authentication {
     private $root;
     private $redirect = false;
 
-    public function __construct ($root, $db, $config, $yamlSlow, $slim, $cache) {
+    public function __construct ($root, $db, $config, $yamlSlow, $route, $cache) {
         $this->db = $db;
         $this->config = $config;
         $this->yamlSlow = $yamlSlow;
-        $this->slim = $slim;
+        $this->route = $route;
         $this->root = $root;
         $this->cache = $cache;
     }
@@ -166,7 +166,7 @@ class Authentication {
         if (!isset($this->routes)) {
             return;
         }
-        $this->slim->hook('slim.before.dispatch', function () {
+        $this->route->before(function () {
             $pattern = $_SERVER['REQUEST_URI'];
             $this->redirect = $pattern;
             if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
