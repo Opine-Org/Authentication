@@ -207,6 +207,7 @@ class Authentication {
                 $redirect = $this->redirectsLogin[$groups[0]];
             }
             if ($send === true) {
+                $_SESSION['acl_redirect'] = $pattern;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
                 header($location);
@@ -228,6 +229,7 @@ class Authentication {
                 $redirect = $this->redirectsDenied[$groups[0]];
             }
             if ($send === true) {
+                $_SESSION['acl_redirect'] = $pattern;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
                 header($location);
