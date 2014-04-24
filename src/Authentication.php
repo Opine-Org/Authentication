@@ -53,16 +53,7 @@ class Authentication {
         return false;
     }
 
-    public function login ($identity, $password, $identityField='email', $criteria=false) {
-        if ($criteria === false) {
-            $criteria = [
-                $identityField => $identity,
-                'password' => $this->passwordHash($password)
-            ];
-        }
-        if ($identityField == 'email') {
-            $identity = trim(strtolower($identity));
-        }
+    private function userFindAndEstablishSession ($criteria) {
         $user = $this->db->collection('users')->findOne(
             $criteria, [
                 '_id', 
@@ -83,6 +74,26 @@ class Authentication {
             'created_date' => new \MongoDate(strtotime('now'))
         ]);
         return true;
+    }
+
+    public function login ($identity, $password, $identityField='email', $criteria=false) {
+        if ($identityField == 'email') {
+            $identity = trim(strtolower($identity));
+        }
+        if ($criteria === false) {
+            $criteria = [
+                $identityField => $identity,
+                'password' => $this->passwordHash($password)
+            ];
+        }
+        return $this->userFindAndEstablishSession($criteria);
+    }
+
+    public function loginByUserId ($userId) {
+        $criteria = [
+            '_id' => $this->db->id($userId)
+        ];
+        return $this->userFindAndEstablishSession($criteria);
     }
 
     public function permission ($group) {
