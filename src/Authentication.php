@@ -252,6 +252,18 @@ class Authentication {
         return true;
     }
 
+    public function checkAndRedirect ($location) {
+        if (!$this->authenticatedCheck()) {
+            $redirect = '/form/login';
+            $_SESSION['acl_redirect'] = $location;
+            $location = 'Location: ' . $redirect;
+            $this->redirectAppend($location);
+            header($location);
+            exit;
+        }
+        return true;
+    }
+
     private function redirectAppend (&$location) {
         if ($this->redirect !== false) {
             if (substr_count($location, '?') > 0) {
