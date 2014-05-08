@@ -46,7 +46,7 @@ class Authentication {
         $this->cache = $cache;
     }
 
-    public function authenticatedCheck (&$userId=false) {
+    public function check (&$userId=false) {
         if (isset($_SESSION['user']) && isset($_SESSION['user']['_id'])) {
             $userId = $_SESSION['user']['_id'];
             return true;
@@ -213,7 +213,7 @@ class Authentication {
         if (count($groups) == 0) {
             return true;
         }
-        if (!$this->authenticatedCheck()) {
+        if (!$this->check()) {
             $redirect = '/form/login';
             if (isset($this->redirectsLogin[$groups[0]])) {
                 $redirect = $this->redirectsLogin[$groups[0]];
@@ -254,7 +254,7 @@ class Authentication {
     }
 
     public function checkAndRedirect ($location) {
-        if (!$this->authenticatedCheck()) {
+        if (!$this->check()) {
             $redirect = '/form/login';
             $_SESSION['acl_redirect'] = $location;
             $location = 'Location: ' . $redirect;
