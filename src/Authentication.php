@@ -46,8 +46,9 @@ class Authentication {
         $this->cache = $cache;
     }
 
-    public function authenticatedCheck () {
+    public function authenticatedCheck (&$userId=false) {
         if (isset($_SESSION['user']) && isset($_SESSION['user']['_id'])) {
+            $userId = $_SESSION['user']['_id'];
             return true;
         }
         return false;
