@@ -23,6 +23,7 @@
  * THE SOFTWARE.
  */
 namespace Opine;
+use FastRoute\Dispatcher\GroupCountBased;
 
 class Authentication {
     private $db;
@@ -36,14 +37,30 @@ class Authentication {
     private $redirectsDenied = [];
     private $root;
     private $redirect = false;
+    private $collector;
+    private $authClassFile;
+    private $authRouteFile;
+    private $authData;
+    private $cacheRouteData = false;
 
-    public function __construct ($root, $db, $config, $yamlSlow, $route, $cache) {
+    public function __construct ($root, $db, $config, $yamlSlow, $route, $cache, $collector) {
         $this->db = $db;
         $this->config = $config;
         $this->yamlSlow = $yamlSlow;
         $this->route = $route;
         $this->root = $root;
         $this->cache = $cache;
+        $this->collector = $collector;
+        $this->authClassFile = $this->root . '/../acl/AuthData.php';
+        $this->authRouteFile = $this->root . '/../acl/RouteData.php';
+        $this->includeOnce();
+    }
+
+    private function includeOnce () {
+        @include_once($this->authClassFile);
+        if (class_exists('AuthData')) {
+            $this->authData = new \AuthData();
+        }
     }
 
     public function check (&$userId=false) {
@@ -161,69 +178,46 @@ class Authentication {
                     $this->routes[$route][] = $groupName;
                 }
             }
-            if (isset($group['regexes']) && is_array($group['regexes'])) {
-                foreach ($group['regexes'] as $regex) {
-                    if (!isset($this->regexes[$regex])) {
-                        $this->regexes[$regex] = [];
-                    }
-                    $this->regexes[$regex][] = $groupName;
-                }
-            }
             $this->redirectsLogin[$groupName] = $group['redirectLogin'];
             $this->redirectsDenied[$groupName] = $group['redirectDenied'];
         }
+    }
+
+    public function beforeRoute () {
+        $uri = $_SERVER['REQUEST_URI'];
+        $this->redirect = $uri;
+        if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
+            $uri = substr($uri, 0, ((strlen($_SERVER['QUERY_STRING']) + 1) * -1));
+            $this->redirect .= '?' . $_SERVER['QUERY_STRING'];
+        }
+        $this->checkRoute($uri, true);
     }
 
     public function aclRoute () {
         if (!isset($this->routes)) {
             return;
         }
-        $this->route->before(function () {
-            $pattern = $_SERVER['REQUEST_URI'];
-            $this->redirect = $pattern;
-            if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
-                $pattern = substr($pattern, 0, ((strlen($_SERVER['QUERY_STRING']) + 1) * -1));
-                $this->redirect .= '?' . $_SERVER['QUERY_STRING'];
-            }
-            $this->checkRoute($pattern, true);  
-        });
+        $this->route->before('authentication@beforeRoute');
     }
 
-    public function checkRoute ($pattern, $send=true) {
-        $routes = array_keys($this->routes);
-        $regexes = array_keys($this->regexes);
-        $groups = [];
-        if (in_array($pattern, $routes)) {
-            $groups = $this->routes[$pattern];
-        } elseif (count($regexes) > 0) {
-            try {
-                foreach ($regexes as $regex) {
-                    if (preg_match($regex, $pattern)) {
-                        $groups = $this->regexes[$regex];
-                        break; 
-                    }
-                }
-            } catch (\Exception $e) {
-                echo $e->getMessage(), ': ', $regex, ' ', $pattern;
-                exit;
-            }
-        } else {
+    public function checkRoute ($uri, $send=true) {
+        $groups = $this->checkGroupUrl($uri);
+        if (!is_array($groups) || count($groups) == 0) {
             return true;
         }
-        if (count($groups) == 0) {
-            return true;
-        }
+        $redirectsLogin = $this->authData->login();
+        $redirectsDenied = $this->authData->deny();
         if (!$this->check()) {
-            $redirect = '/form/login';
-            if (isset($this->redirectsLogin[$groups[0]])) {
-                $redirect = $this->redirectsLogin[$groups[0]];
+            $redirect = '/form/Login';
+            if (isset($redirectsLogin[$groups[0]])) {
+                $redirect = $redirectsLogin[$groups[0]];
             }
             if ($send === true) {
-                $_SESSION['acl_redirect'] = $pattern;
+                $_SESSION['acl_redirect'] = $uri;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
-                header($location);
-                exit;
+                @header($location);
+                return $location;
             } else {
                 return false;
             }
@@ -237,15 +231,15 @@ class Authentication {
         }
         if ($authorized !== true) {
             $redirect = '/noaccess';
-            if (isset($this->redirectsDenied[$groups[0]])) {
-                $redirect = $this->redirectsDenied[$groups[0]];
+            if (isset($redirectsDenied[$groups[0]])) {
+                $redirect = $redirectsDenied[$groups[0]];
             }
             if ($send === true) {
-                $_SESSION['acl_redirect'] = $pattern;
+                $_SESSION['acl_redirect'] = $uri;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
-                header($location);
-                exit;
+                @header($location);
+                return $location;
             } else {
                 return false;
             }
@@ -259,7 +253,7 @@ class Authentication {
             $_SESSION['acl_redirect'] = $location;
             $location = 'Location: ' . $redirect;
             $this->redirectAppend($location);
-            header($location);
+            @header($location);
             exit;
         }
         return true;
@@ -281,13 +275,12 @@ class Authentication {
             $this->aclConfig($config);
         }
         $json = json_encode([
-            'regexes' => $this->regexes,
             'routes' => $this->routes,
             'redirectsLogin' => $this->redirectsLogin,
             'redirectsDenied' => $this->redirectsDenied
         ], JSON_PRETTY_PRINT);
         $groups = [];
-        foreach (array_merge(array_values($this->regexes), array_values($this->routes)) as $values) {
+        foreach (array_values($this->routes) as $values) {
             foreach ($values as $group) {
                 $groups[] = $group;
             }
@@ -297,10 +290,38 @@ class Authentication {
         foreach ($groups as $group) {
             $this->groupCheck($group);
         }
-        $key = $this->root . '-acl.json';
-        $this->cache->set($key, $json, 2, 0);
         $buildFile = $this->root . '/../acl/_build.json';
         file_put_contents($buildFile, $json);
+        $this->makeClass();
+        return true;
+    }
+
+    private function makeClass () {
+        $buffer = '<?php' . "\n" . 'class AuthData {' . "\n";
+        foreach ($this->routes as $route => $groups) {
+            $method = 'auth' . uniqid();
+            $this->addGroupRegex($route, 'AuthData@' . $method);
+            $buffer .= 'public function ' . $method . '() {' . "\n";
+            $buffer .= "\t" . 'return ' . var_export($groups, true) . ';' . "\n";
+            $buffer .= '}' . "\n\n"; 
+        }
+        $buffer .= 'public function login () {' . "\n";
+        $buffer .= "\t" . 'return ' . var_export($this->redirectsLogin, true) . ';' . "\n";
+        $buffer .= '}' . "\n\n";
+
+        $buffer .= 'public function deny () {' . "\n";
+        $buffer .= "\t" . 'return ' . var_export($this->redirectsDenied, true) . ';' . "\n";
+        $buffer .= '}' . "\n\n";
+
+        $buffer .= '}' . "\n";
+        file_put_contents($this->authClassFile, $buffer);
+        $this->includeOnce();
+        file_put_contents(
+            $this->authRouteFile,
+            '<?php return ' . var_export($this->collector->getData(), true) . ';'
+        );
+        $key = $this->root . '-acl';
+        $this->cache->set($key, json_encode($this->collector->getData()), 2, 0);
     }
 
     private function groupCheck ($group) {
@@ -310,10 +331,33 @@ class Authentication {
         }
     }
 
-    public function cacheSet ($auth) {
-        $this->regexes = $auth['regexes'];
-        $this->routes = $auth['routes'];
-        $this->redirectsLogin = $auth['redirectsLogin'];
-        $this->redirectsDenied = $auth['redirectsDenied'];
+    public function cacheSet ($cacheRouteData) {
+        $this->cacheRouteData = $cacheRouteData;
+    }
+
+    public function addGroupRegex ($pattern, $callback) {
+        $callback = explode('@', $callback);
+        $this->collector->addRoute('GET', $pattern, $callback);
+    }
+
+    public function checkGroupUrl ($uri) {
+        if ($this->cacheRouteData === false) {
+            $this->cacheRouteData = require $this->authRouteFile;
+        }
+        $dispatcher = new GroupCountBased($this->cacheRouteData);
+        $route = $dispatcher->dispatch('GET', $uri);
+        switch ($route[0]) {
+            case \FastRoute\Dispatcher::NOT_FOUND:
+                return false;
+
+            case \FastRoute\Dispatcher::METHOD_NOT_ALLOWED:
+                return false;
+
+            case \FastRoute\Dispatcher::FOUND:
+                return call_user_func_array($route[1], $route[2]);
+            
+            default:
+                return false;
+        }
     }
 }

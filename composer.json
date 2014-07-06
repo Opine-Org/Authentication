@@ -5,6 +5,7 @@
     "keywords": [
 
     ],
+    "minimum-stability": "dev",
     "license": "MIT",
     "authors": [
         {
@@ -16,7 +17,17 @@
     ],
     "require": {
         "php": ">=5.4.0",
-        "hybridauth/hybridauth": "dev-master"
+        "phpunit\/phpunit": "3.7.32",
+        "hybridauth/hybridauth": "dev-master",
+        "opine/cache": "dev-master",
+        "opine/collection": "dev-master",
+        "opine/config": "dev-master",
+        "opine/container": "dev-master",
+        "opine/db": "dev-master",
+        "opine/pubsub": "dev-master",
+        "opine/queue": "dev-master",
+        "opine\/container": "dev-master",
+        "nikic\/fast-route": "dev-master"
     },
     "autoload": {
         "psr-4": {

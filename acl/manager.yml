@@ -1,0 +1,25 @@
+groups:
+    manager:
+        routes:
+            - '/Manager'
+            - '/Manager/add/Users/users'
+            - '/Manager/edit/Users/users:{id}'
+            - '/Manager/list/Users'
+        redirectLogin: '/Manager/login'
+        redirectDenied: '/Manager/noaccess'
+    manager-People:
+        routes:
+            - '/Manager'
+            - '/Manager/add/Users/users'
+            - '/Manager/edit/Users/users:{id}'
+            - '/Manager/list/Users'
+        redirectLogin: '/Manager/login'
+        redirectDenied: '/Manager/noaccess'
+    manager-specific-Users:
+        routes:
+            - '/Manager'
+            - '/Manager/add/Users/users'
+            - '/Manager/edit/Users/users:{id}'
+            - '/Manager/list/Users'
+        redirectLogin: '/Manager/login'
+        redirectDenied: '/Manager/noaccess'
