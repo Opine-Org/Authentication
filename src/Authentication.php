@@ -51,8 +51,8 @@ class Authentication {
         $this->root = $root;
         $this->cache = $cache;
         $this->collector = $collector;
-        $this->authClassFile = $this->root . '/../acl/AuthData.php';
-        $this->authRouteFile = $this->root . '/../acl/RouteData.php';
+        $this->authClassFile = $this->root . '/../cache/AclAuthData.php';
+        $this->authRouteFile = $this->root . '/../cache/AclRouteData.php';
         $this->includeOnce();
     }
 
@@ -290,7 +290,7 @@ class Authentication {
         foreach ($groups as $group) {
             $this->groupCheck($group);
         }
-        $buildFile = $this->root . '/../acl/_build.json';
+        $buildFile = $this->root . '/../cache/acl.json';
         file_put_contents($buildFile, $json);
         $this->makeClass();
         return true;
