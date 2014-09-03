@@ -51,8 +51,8 @@ class Authentication {
         $this->root = $root;
         $this->cache = $cache;
         $this->collector = $collector;
-        $this->authClassFile = $this->root . '/../cache/AclAuthData.php';
-        $this->authRouteFile = $this->root . '/../cache/AclRouteData.php';
+        $this->authClassFile = $this->root . '/../cache/acl-class.php';
+        $this->authRouteFile = $this->root . '/../cache/acl-routes.php';
         $this->includeOnce();
     }
 
@@ -184,13 +184,13 @@ class Authentication {
     }
 
     public function beforeRoute () {
-        $uri = $_SERVER['REQUEST_URI'];
-        $this->redirect = $uri;
-        if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
-            $uri = substr($uri, 0, ((strlen($_SERVER['QUERY_STRING']) + 1) * -1));
-            $this->redirect .= '?' . $_SERVER['QUERY_STRING'];
+        $path = $this->route->pathGet();
+        $queryString = $this->route->queryStringGet();
+        $this->redirect = $path;
+        if ($queryString != '') {
+            $this->redirect .= '?' . $queryString;
         }
-        $this->checkRoute($uri, true);
+        $this->checkRoute($path, true);
     }
 
     public function aclRoute () {
@@ -200,8 +200,8 @@ class Authentication {
         $this->route->before('authentication@beforeRoute');
     }
 
-    public function checkRoute ($uri, $send=true) {
-        $groups = $this->checkGroupUrl($uri);
+    public function checkRoute ($path, $send=true) {
+        $groups = $this->checkGroupUrl($path);
         if (!is_array($groups) || count($groups) == 0) {
             return true;
         }
@@ -213,7 +213,7 @@ class Authentication {
                 $redirect = $redirectsLogin[$groups[0]];
             }
             if ($send === true) {
-                $_SESSION['acl_redirect'] = $uri;
+                $_SESSION['acl_redirect'] = $path;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
                 @header($location);
@@ -235,7 +235,7 @@ class Authentication {
                 $redirect = $redirectsDenied[$groups[0]];
             }
             if ($send === true) {
-                $_SESSION['acl_redirect'] = $uri;
+                $_SESSION['acl_redirect'] = $path;
                 $location = 'Location: ' . $redirect;
                 $this->redirectAppend($location);
                 @header($location);
@@ -340,12 +340,12 @@ class Authentication {
         $this->collector->addRoute('GET', $pattern, $callback);
     }
 
-    public function checkGroupUrl ($uri) {
+    public function checkGroupUrl ($path) {
         if ($this->cacheRouteData === false) {
             $this->cacheRouteData = require $this->authRouteFile;
         }
         $dispatcher = new GroupCountBased($this->cacheRouteData);
-        $route = $dispatcher->dispatch('GET', $uri);
+        $route = $dispatcher->dispatch('GET', $path);
         switch ($route[0]) {
             case \FastRoute\Dispatcher::NOT_FOUND:
                 return false;
