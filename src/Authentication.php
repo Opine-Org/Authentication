@@ -342,6 +342,9 @@ class Authentication {
 
     public function checkGroupUrl ($path) {
         if ($this->cacheRouteData === false) {
+            if (!file_exists($this->authRouteFile)) {
+                return false;
+            }
             $this->cacheRouteData = require $this->authRouteFile;
         }
         $dispatcher = new GroupCountBased($this->cacheRouteData);
