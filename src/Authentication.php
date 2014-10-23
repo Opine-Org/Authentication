@@ -321,7 +321,7 @@ class Authentication {
             '<?php return ' . var_export($this->collector->getData(), true) . ';'
         );
         $key = $this->root . '-acl';
-        $this->cache->set($key, json_encode($this->collector->getData()), 2, 0);
+        $this->cache->set($key, json_encode($this->collector->getData()), 0);
     }
 
     private function groupCheck ($group) {
